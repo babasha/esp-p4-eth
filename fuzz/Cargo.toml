@@ -1,0 +1,29 @@
+[package]
+name = "esp-p4-eth-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+esp-p4-eth = { path = "..", features = ["fuzzing"] }
+
+[[bin]]
+name = "rx_receive"
+path = "fuzz_targets/rx_receive.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tx_transmit"
+path = "fuzz_targets/tx_transmit.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = []

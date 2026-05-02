@@ -1,0 +1,251 @@
+[package]
+name = "esp-p4-eth"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "no_std async Ethernet MAC driver for ESP32-P4 RMII designs (embassy-net compatible)"
+repository = "https://github.com/babasha/DriverP4"
+homepage = "https://github.com/babasha/DriverP4"
+documentation = "https://docs.rs/esp-p4-eth"
+readme = "README.md"
+keywords = ["esp32", "esp32p4", "ethernet", "embassy", "no-std"]
+categories = ["embedded", "network-programming", "no-std", "hardware-support"]
+build = "build.rs"
+
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = ["mock-time", "embassy-net-tcp", "embassy-net-icmp"]
+fuzzing = []
+ip101 = []
+hal-integration = ["dep:esp-hal"]
+hal-smoke = ["hal-integration", "esp-hal/esp32c6", "esp-hal/unstable"]
+p4-example = []
+# Optional embassy-net features. Off by default in the slim P4 build path so
+# binaries fit below the L2 cache region (0x4FF80000) on the Waveshare P4-ETH
+# board. Enable explicitly when an example needs the corresponding capability.
+embassy-net-tcp = ["embassy-net/tcp"]
+embassy-net-udp = ["embassy-net/udp"]
+embassy-net-icmp = ["embassy-net/auto-icmp-echo-reply"]
+# Use embassy-time's bundled mock driver. Required for host tests and for the
+# legacy P4 examples that still spawn `mock_time_task`. Mutually exclusive with
+# `p4-time-driver`.
+mock-time = ["embassy-time/mock-driver"]
+# SYSTIMER-backed embassy-time driver (polling). Use with --no-default-features
+# to keep `mock-time` off (otherwise embassy-time gets two drivers and the
+# linker fails with duplicate _embassy_time_now).
+p4-time-driver = [
+    "embassy-time/tick-hz-1_000_000",
+    "dep:embassy-time-driver",
+    "dep:embassy-time-queue-utils",
+]
+# IRQ-driven SYSTIMER+CLIC embassy-time driver. Mutually exclusive with
+# `p4-time-driver` (only one `time_driver_impl!` per crate). Use this for
+# real workloads — the executor drops to `wfi` when idle instead of burning
+# a core in a polling task.
+p4-time-driver-irq = [
+    "embassy-time/tick-hz-1_000_000",
+    "dep:embassy-time-driver",
+    "dep:embassy-time-queue-utils",
+]
+# Diagnostic feature for cold-boot hang investigation. When enabled,
+# `phy::Ip101::init` writes step-by-step progress markers to UART0 (raw
+# MMIO writes — no UART driver needed). Off by default; zero overhead.
+phy-init-debug = []
+# Gate for the bring-up / scratch examples under `examples/dev/`. The
+# canonical OSS examples (embassy_static_ping, embassy_dhcp,
+# embassy_tcp_echo_irq) build without this. Internal-use only.
+dev-examples = []
+
+[dependencies]
+embassy-net-driver-channel = "0.3"
+embassy-executor = { version = "0.9", features = ["arch-riscv32", "executor-thread"] }
+embassy-futures = "0.1"
+embassy-net = { version = "0.9", default-features = false, features = ["medium-ethernet", "proto-ipv4", "dhcpv4"] }
+embassy-sync = "0.7"
+embassy-time = { version = "0.5", default-features = false }
+embassy-time-driver = { version = "0.2", default-features = false, optional = true }
+embassy-time-queue-utils = { version = "0.3", default-features = false, optional = true }
+# `critical-section` is required by the L1+L2 cache ROM helper wrap in
+# `dma::sync_cache_region` and is part of the cold-boot reliability fix —
+# it is unconditional, not gated behind a time-driver feature.
+critical-section = { version = "1.2", default-features = false }
+heapless = { version = "0.9", default-features = false }
+static_cell = "2"
+vcell = "0.1"
+esp-hal = { version = "~1.0", default-features = false, features = ["requires-unstable"], optional = true }
+
+[target.riscv32imafc-unknown-none-elf.dev-dependencies]
+esp32p4 = { version = "0.2.0", features = ["rt"] }
+panic-halt = "1.0"
+riscv = { version = "0.15.0", features = ["critical-section-single-hart"] }
+riscv-rt = { version = "0.16.0", features = ["memory", "device"] }
+
+[target.x86_64-pc-windows-msvc.dev-dependencies]
+critical-section = { version = "1.2", features = ["std"] }
+
+[target.x86_64-unknown-linux-gnu.dev-dependencies]
+critical-section = { version = "1.2", features = ["std"] }
+
+# --- Canonical examples (public, build by default with required features) ---
+
+[[example]]
+name = "embassy_dhcp"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver"]
+
+[[example]]
+name = "embassy_static_ping"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver", "embassy-net-icmp"]
+
+[[example]]
+name = "embassy_tcp_echo_irq"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver-irq", "embassy-net-tcp"]
+
+[[example]]
+name = "embassy_tcp_soak"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver-irq", "embassy-net-tcp"]
+
+# --- Dev / bring-up examples (gated behind `dev-examples`, live in examples/dev/) ---
+
+[[example]]
+name = "emac_hello"
+path = "examples/dev/emac_hello.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "emac_loopback"
+path = "examples/dev/emac_loopback.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "emac_raw"
+path = "examples/dev/emac_raw.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "emac_dhcp"
+path = "examples/dev/emac_dhcp.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "dhcp_echo"
+path = "examples/dev/dhcp_echo.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "static_ip"
+path = "examples/dev/static_ip.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "emac_init"
+path = "examples/dev/emac_init.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "phy_probe"
+path = "examples/dev/phy_probe.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "clk_dump"
+path = "examples/dev/clk_dump.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "mdio_test"
+path = "examples/dev/mdio_test.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "embassy_smoke"
+path = "examples/dev/embassy_smoke.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "systimer_probe"
+path = "examples/dev/systimer_probe.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "embassy_time_smoke"
+path = "examples/dev/embassy_time_smoke.rs"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver", "dev-examples"]
+
+[[example]]
+name = "embassy_tcp_echo"
+path = "examples/dev/embassy_tcp_echo.rs"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver", "embassy-net-tcp", "dev-examples"]
+
+[[example]]
+name = "embassy_udp_echo"
+path = "examples/dev/embassy_udp_echo.rs"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver", "embassy-net-udp", "dev-examples"]
+
+[[example]]
+name = "clic_irq_smoke"
+path = "examples/dev/clic_irq_smoke.rs"
+test = false
+bench = false
+required-features = ["p4-example", "dev-examples"]
+
+[[example]]
+name = "embassy_irq_smoke"
+path = "examples/dev/embassy_irq_smoke.rs"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver-irq", "dev-examples"]
+
+[[example]]
+name = "embassy_tcp_stress_irq"
+path = "examples/dev/embassy_tcp_stress_irq.rs"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver-irq", "embassy-net-tcp", "dev-examples"]
+
+[[example]]
+name = "phy_init_diag"
+path = "examples/dev/phy_init_diag.rs"
+test = false
+bench = false
+required-features = ["p4-example", "p4-time-driver-irq", "phy-init-debug", "dev-examples"]
