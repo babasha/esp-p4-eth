@@ -1,0 +1,30 @@
+# Rust build artifacts
+**/target/
+# Stray cargo output dirs from interrupted builds (e.g. target_fresh_161820)
+**/target_*/
+
+# macOS Finder metadata
+.DS_Store
+**/.DS_Store
+
+# Windows / OneDrive sync conflict copies (e.g. file.rs~8728)
+*~[0-9]*
+*.tmp
+.tmp-*
+
+# Cross-compile flash images copied to repo root for `espflash flash --ram`
+/*.elf
+
+# UART/test capture archives — kept locally for reference, not for the repo
+/*.log
+
+# Claude Code local-only state (per-machine, not for the repo)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# Generic editor / OS junk
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db

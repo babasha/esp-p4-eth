@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  host-tests:
+    name: Host unit tests (x86_64-unknown-linux-gnu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo test (lib, host target)
+        working-directory: esp-p4-eth
+        run: |
+          cargo test \
+            --target x86_64-unknown-linux-gnu \
+            --lib \
+            --features p4-example
+
+  target-check:
+    name: Target build check (riscv32imafc-unknown-none-elf)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly with riscv32imafc target
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          targets: riscv32imafc-unknown-none-elf
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check (P4 slim build, no examples)
+        working-directory: esp-p4-eth
+        run: |
+          cargo check \
+            --target riscv32imafc-unknown-none-elf \
+            --no-default-features \
+            --features p4-time-driver
+      - name: cargo build embassy_static_ping example
+        working-directory: esp-p4-eth
+        run: |
+          cargo build \
+            --target riscv32imafc-unknown-none-elf \
+            --no-default-features \
+            --features p4-example,p4-time-driver,embassy-net-icmp \
+            --example embassy_static_ping
+      - name: cargo build embassy_tcp_echo example
+        working-directory: esp-p4-eth
+        run: |
+          cargo build \
+            --target riscv32imafc-unknown-none-elf \
+            --no-default-features \
+            --features p4-example,p4-time-driver,embassy-net-tcp \
+            --example embassy_tcp_echo
+      - name: cargo build embassy_udp_echo example
+        working-directory: esp-p4-eth
+        run: |
+          cargo build \
+            --target riscv32imafc-unknown-none-elf \
+            --no-default-features \
+            --features p4-example,p4-time-driver,embassy-net-udp \
+            --example embassy_udp_echo
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: cargo fmt --check
+        working-directory: esp-p4-eth
+        run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy (host target)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: clippy
+          targets: x86_64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo clippy
+        working-directory: esp-p4-eth
+        run: |
+          cargo clippy \
+            --target x86_64-unknown-linux-gnu \
+            --lib \
+            --features p4-example \
+            -- -D warnings
